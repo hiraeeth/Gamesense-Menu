@@ -1,43 +1,28 @@
 local menu = {}
---[[
-    Object oriented gamesense menu system
-    Created by dragos112 
 
-    📂 - Functions (element as menu_element):
-    - element:get 
-    - element:set 
-    - element:set_visible
-    - element:set_enabled
-    - element:set_callback
-    - element:name
+---@global overrides
+local function ternary(condition, true_value, false_value)
+    --- Ternary operator.
+    --- @param condition boolean The condition to check
+    --- @param true_value any The value to return if the condition is true
+    --- @param false_value any The value to return if the condition is false
+    if condition then
+        return true_value
+    else
+        return false_value
+    end
+end
 
-    🆕 - Added by me 
-    - element:reference
-    - element:type
-    - element:list
-    - element:depend
-    - element:update
-    - element:contains
+local type = function(var, type_name)
+    --- Checks the type of a variable.
+    --- @param var any The variable to check
+    --- @param type_name? string The expected type (optional)
+    --- @return string|boolean The type of the variable or a boolean indicating type match
+    return ternary(type_name, type(var) == type_name, type(var))
+end
 
-    🔗 - Other properties
-    - element.args
-    - element.dependency
-    - element.is_visible
-
-    📜 - Note: menu_element is a structure that includes all the functions mentioned above.
-    🚨 - Warning! Please use ":" to call functions and "." to access properties of menu elements.
-
-    @module menu
-]]
-
---[[
-    📜 - For each function, I've provided instructions in case you want to use it in your own code.
-]]
-
--- Prints colored text to the console
----@param ... any[] Text or values to print
-local print_colored = function(...)
-    local args = {...}
+local function print_colored(...)
+    local args = { ... }
     for key, arg in ipairs(args) do
         if type(arg) == "table" then
             client.color_log(arg[2], arg[3], arg[4], tostring(arg[1]) .. "\0")
@@ -48,10 +33,10 @@ local print_colored = function(...)
     client.color_log(1, 1, 1, " ")
 end
 
--- Prints text to the console
----@param ... any[] Text or values to print
-local print = function(...)
-    local message = {...}
+--- Prints text to the console.
+--- @param ... any[] Text or values to print
+local function print(...)
+    local message = { ... }
     for k, v in ipairs(message) do
         message[k] = tostring(v);
     end
@@ -59,56 +44,28 @@ local print = function(...)
     print_colored(message)
 end
 
--- Converts RGB values to hexadecimal color format
----@param r number Red value (0-255)
----@param g number Green value (0-255)
----@param b number Blue value (0-255)
----@param a? number Alpha value (0-255), optional
-local toHEX = function(r, g, b, a)
-    return string.format('\a%02X%02X%02X%02X', r, g, b, a or 255)
-end
-
--- Implements a ternary operator
----@param condition boolean The condition to check
----@param true_value any Value to return if the condition is true
----@param false_value any Value to return if the condition is false
-local ternary = function(condition, true_value, false_value)
-    if condition then
-        return true_value
-    else
-        return false_value
-    end
-end
-
--- Checks the type of a variable
----@param var any The variable to check
----@param type_name? string The expected type (optional)
-local type = function(var, type_name)
-    return ternary(type_name, type(var) == type_name, type(var))
-end
-
--- Parses a table using a given function
----@param tbl table The table to parse
----@param fn function The function to apply to each key-value pair
-local parse = function(tbl, fn)
+local function parse(tbl, fn)
+    --- Parses a table using a given function.
+    --- @param tbl table The table to parse
+    --- @param fn function The function to apply to each key-value pair
     for key, value in pairs(tbl) do
-        return fn(key, value)
+        fn(key, value)
     end
 end
 
--- Clamps a value within a given range
----@param value number The value to clamp
----@param min number The minimum value
----@param max number The maximum value
 math.clamp = function(value, min, max)
+    --- Clamps a value within a given range.
+    --- @param value number The value to clamp
+    --- @param min number The minimum value
+    --- @param max number The maximum value
     return math.min(math.max(value, min), max)
 end
 
--- Merges multiple tables into a single table
----@vararg table List of tables to merge
 table.merge = function(...)
+    --- Merges multiple tables into a single table.
+    --- @vararg table List of tables to merge
     local result = {}
-    parse({...}, function(k, tbl)
+    parse({ ... }, function(_, tbl)
         parse(tbl, function(_, v)
             table.insert(result, v)
         end)
@@ -116,11 +73,11 @@ table.merge = function(...)
     return result
 end
 
--- Checks if a table contains a specific item
----@param table table The table to check
----@param item any The item to search for
-table.contains = function(table, item)
-    for _, value in pairs(table) do
+table.contains = function(tbl, item)
+    --- Checks if a table contains a specific item.
+    --- @param tbl table The table to check
+    --- @param item any The item to search for
+    for _, value in pairs(tbl) do
         if value == item then
             return true
         end
@@ -128,9 +85,9 @@ table.contains = function(table, item)
     return false
 end
 
--- Implements a switch-case statement
----@param c any The variable to switch upon
-local switch = function(c)
+local function switch(c)
+    --- Implements a switch-case statement.
+    --- @param c any The variable to switch upon
     local cases = {
         var = c,
         default = nil,
@@ -139,16 +96,14 @@ local switch = function(c)
     setmetatable(cases, {
         __call = function(self, code)
             local f
-            if (self.var) then
+            if self.var then
                 for case, func in pairs(code) do
                     if type(case) == "table" and table.contains(case, self.var) or case == self.var then
                         f = func
                         break
                     end
                 end
-                if not f then
-                    f = code.default
-                end
+                f = f or code.default
             else
                 f = code.missing or code.default
             end
@@ -164,22 +119,22 @@ local switch = function(c)
     return cases
 end
 
--- Prints menu-related errors to the console
----@param ... any[] Error messages or values to print
-local menu_error = function(...)
-    local args = {...}
+local function menu_error(...)
+    --- Prints menu-related errors to the console.
+    --- @param ... any[] Error messages or values to print
+    local args = { ... }
     parse(args, function(key, arg)
         args[key] = tostring(arg)
     end)
-    print_colored({_NAME .. " » ", 171, 219, 0}, table.concat(args, " "))
+    print_colored({ _NAME .. " » ", 171, 219, 0 }, table.concat(args, " "))
 end
 
--- Checks if an element contains a specific value
----@param element any The menu element to check
----@param value any The value to search for
----@return boolean True if the element contains the value, false otherwise
 menu.contains = function(element, value)
-    local boolean = false;
+    --- Checks if an element contains a specific value.
+    --- @param element any The menu element to check
+    --- @param value any The value to search for
+    --- @return boolean True if the element contains the value, false otherwise
+    local boolean = false
     switch(element:type()) {
         listbox = function()
             boolean = element:list()[element:get() + 1] == value
@@ -188,34 +143,271 @@ menu.contains = function(element, value)
             boolean = element:get() == value
         end,
         multiselect = function()
-            parse(element:get(), function(key, name)
-                if name == value then
+            for _, v in ipairs(element:get()) do
+                if v == value then
                     boolean = true
                 end
-            end)
+            end
         end
     }
     return boolean
 end
 
----@param args any The arguments provided to the menu element
----@field dependency table[] The dependency array of the menu element
----@field is_visible boolean The visibility status of the menu element
----@field get fun(): any Returns the value of the menu element
----@field set fun(...): {any} Sets the value of the menu element
----@field reference fun(): any Returns a reference to the menu element
----@field set_visible fun(boolean): {any} Sets the visibility of the menu element
----@field set_enabled fun(boolean): {any} Sets the enabled status of the menu element
----@field set_callback fun(callback: fun(self: any, menu_ref: any)): {any} Sets a callback for the menu element
----@field name fun(original?: any): any Returns the name of the menu element or original if provided
----@field type fun(): string Returns the type of the menu element as a string
----@field list fun(): table | nil Returns the list of values of the menu element or nil if not a table
----@field depend fun(dependency: any, value: any): {any} Handles dependencies of the menu element
----@field update fun(...): {any} Updates the menu element with new values
+--- @return group struct
+menu.group = function(tab, container)
+    --- Creates a menu group.
+    --- @param tab any The menu tab
+    --- @param container any The menu container
+    local struct = {
+        tab = tab,
+        container = container,
+    }
+    setmetatable(struct, {
+        __tostring = function(self)
+            return string.format("menu::%s", "group")
+        end,
+        __newindex = function()
+            return
+        end,
+        __metatable = false
+    })
+    return struct
+end
+
+--- @return element struct The menu element structure
+local function struct(menu_type, item, args)
+    --- Creates a menu element structure.
+    --- @param menu_type string The type of menu element
+    --- @param item any The menu element reference
+    --- @param args? table The arguments for the menu element (optional)
+    local struct = {
+        dependency = {},
+        is_visible = true,
+
+        --- Gets the value of the menu element.
+        --- @return any The value of the menu element
+        get = function(self)
+            if not self then
+                menu_error(("Invalid usage, please use: [%s]:get()"):format(menu_type))
+                return
+            end
+            return ui.get(item)
+        end,
+
+        --- Sets the value of the menu element.
+        --- @vararg any Values to set for the menu element
+        --- @return {element: menu_element, any: ...} The menu element and set values
+        set = function(self, ...)
+            if not self then
+                menu_error(("Invalid usage, please use: [%s]:set(...)"):format(menu_type))
+                return
+            end
+            ui.set(item, ...)
+            return { self, ... }
+        end,
+
+        --- Gets the reference of the menu element.
+        --- @return number The reference number of the menu element
+        reference = function(self)
+            if not self then
+                menu_error(("Invalid usage, please use: [%s]:reference()"):format(menu_type))
+                return
+            end
+            return item
+        end,
+
+        --- Sets the visibility of the menu element.
+        --- @param boolean boolean The visibility status
+        --- @return {element: menu_element, boolean: value_to_set} The menu element and set visibility status
+        set_visible = function(self, boolean)
+            if not self then
+                menu_error(("Invalid usage, please use: [%s]:set_visible(boolean)"):format(menu_type))
+                return
+            end
+            ui.set_visible(item, boolean)
+            self.is_visible = boolean
+            return { self, boolean }
+        end,
+
+        --- Sets the enabled status of the menu element.
+        --- @param boolean boolean The enabled status
+        --- @return {element: menu_element, boolean: value_to_set} The menu element and set enabled status
+        set_enabled = function(self, boolean)
+            if not self then
+                menu_error(("Invalid usage, please use: [%s]:set_enabled(boolean)"):format(menu_type))
+                return
+            end
+            ui.set_enabled(item, boolean)
+            return { self, boolean }
+        end,
+
+        --- Sets the callback function for the menu element.
+        --- @param callback function The callback function
+        --- @return {element: menu_element, function: callback} The menu element and set callback function
+        set_callback = function(self, callback)
+            if not self then
+                menu_error(("Invalid usage, please use: [%s]:set_callback(function(element,original))"):format(menu_type))
+                return
+            end
+            ui.set_callback(item, function(menu_ref)
+                callback(self, menu_ref)
+            end)
+            return { self, callback }
+        end,
+
+        --- Gets the name of the menu element.
+        --- @return string The name of the menu element
+        name = function(self)
+            if not self then
+                menu_error(("Invalid usage, please use: [%s]:name()"):format(menu_type))
+                return
+            end
+            return ui.name(item)
+        end,
+
+        --- Gets the type of the menu element.
+        --- @return string The type of the menu element
+        type = function(self)
+            if not self then
+                menu_error(("Invalid usage, please use: [%s]:type()"):format(menu_type))
+                return
+            end
+            return ui.type(item)
+        end,
+
+        --- Adds a dependency to the menu element.
+        --- @param dependency table The dependent menu element
+        --- @param value any The optional value for the dependency
+        --- @return {element: menu_element, dependency: menu_element, boolean: dependency_value, any: value} The menu element, dependency, dependency value, and optional value
+        depend = function(self, dependency, value)
+            if not (self and dependency) then
+                return menu_error("Invalid usage, please use: [element]:depend(element, ?value)")
+            end
+
+            self.dependency = self.dependency or {}
+            if not table.contains(self.dependency, { dependency, value or nil }) then
+                table.insert(self.dependency, { dependency, value or nil })
+            end
+
+            local vis = true
+            for k, v in ipairs(self.dependency) do
+                vis = vis and ternary(v[2], menu.contains(v[1], value), v[1]:get())
+            end
+
+            self.is_visible = vis
+            self:set_visible(vis)
+
+            return ternary(value, { self, dependency, dependency:get(), value }, { self, dependency, dependency:get() })
+        end,
+
+        -- Adds more dependecies to a menu element
+        multi_depend = function(self, ...)
+            if not self then
+                menu_error(("Invalid usage, please use: [%s]:multi_depend(...)"):format(menu_type))
+                return
+            end
+            for k, v in ipairs({ ... }) do
+                if (v[1] ~= nil) then
+                    self:depend(v[1], v[2])
+                else
+                    self:depend(v)
+                end
+            end
+            return self.dependency
+        end,
+
+        --- Updates the menu element.
+        --- @vararg any Values to update for the menu element
+        --- @return {element: menu_element, any: ...} The menu element and updated values
+        update = function(self, ...)
+            if not self then
+                menu_error(("Invalid usage, please use: [%s]:update(...)"):format(menu_type))
+                return
+            end
+            ui.update(item, ...)
+            return { self, ... }
+        end,
+
+        --- Checks if the menu element contains a specific value.
+        --- @param value any The value to check
+        --- @return boolean True if the element contains the value, false otherwise
+        contains = function(self, value)
+            if not self then
+                menu_error(("Invalid usage, please use: [%s]:contains(value)"):format(menu_type))
+                return
+            end
+            return menu.contains(self, value)
+        end
+    }
+
+    if args then
+        struct.args = args
+
+        --- Gets the list content of the menu element.
+        --- @return table|nil The list content or nil if not applicable
+        struct.list = function(self)
+            if not self then
+                menu_error(("Invalid usage, please use: [%s]:list()"):format(menu_type))
+                return
+            end
+            return type(args[4]) == "table" and args[4] or nil
+        end
+    end
+
+    setmetatable(struct, {
+        __tostring = function(self)
+            if (args and type(args[4], "table")) then
+                return string.format("%s::%s[%s](%s)", menu_type, struct:type(), #args[4], struct:name())
+            else
+                return string.format("%s::%s(%s)", menu_type, struct:type(), struct:name())
+            end
+        end,
+        __newindex = function()
+            return
+        end,
+        __metatable = false
+    })
+
+    return struct
+end
+
+--- Referencing to a gamesense element
+---@vararg any The arguments provided to the menu element
+---@return table A struct representing the menu element
+menu.find = function(...)
+    local args = { ... }
+
+    local item = { ui.reference(unpack(args)) }
+    local child = args[#args]
+
+    if #item < child then
+        return menu_error("[menu_find] You are trying to access an invalid child (too big)")
+    end
+
+    if #item == 1 then
+        item = item[1]
+    else
+        if not type(child, "number") then
+            child = 1
+        end
+        item = item[child]
+    end
+
+    return struct("reference", item)
+end
+
 setmetatable(menu, {
     __index = function(self, index)
         return function(...)
-            local args = {...}
+            local args = { ... }
+
+            for k, v in ipairs(args) do
+                if tostring(v) == "menu::group" then
+                    args[k] = v.tab;
+                    table.insert(args, k + 1, v.container)
+                end
+            end
+
             local name = args[3]
             switch(index) {
                 button = function()
@@ -227,160 +419,7 @@ setmetatable(menu, {
             }
 
             local item = ui["new_" .. index](unpack(args))
-            local struct = {
-                args = args,
-                dependency = {},
-                is_visible = true,
-
-                ---@return any 
-                get = function(self)
-                    if not self then
-                        menu_error("Invalid usage, please use: [element]:get()")
-                        return
-                    end
-                    return ui.get(item)
-                end,
-
-                ---@return {element: menu_element, any: ...} 
-                set = function(self, ...)
-                    if not self then
-                        menu_error("Invalid usage, please use: [element]:set(any: ...)")
-                        return
-                    end
-                    ui.set(item, unpack({...}))
-                    return {self, unpack({...})}
-                end,
-
-                ---@return number
-                reference = function(self)
-                    if not self then
-                        menu_error("Invalid usage, please use: [element]:reference()")
-                        return
-                    end
-                    return item
-                end,
-
-                ---@return {element: menu_element, boolean: value_to_set} 
-                set_visible = function(self, boolean)
-                    if not self then
-                        menu_error("Invalid usage, please use: [element]:set_visibile(boolean: value_to_set)")
-                        return
-                    end
-                    ui.set_visible(item, boolean)
-                    self.visibility = boolean
-                    return {self, boolean}
-                end,
-
-                ---@return {element: menu_element, boolean: value_to_set} 
-                set_enabled = function(self, boolean)
-                    if not self then
-                        menu_error("Invalid usage, please use: [element]:set_enabled(boolean: value_to_set)")
-                        return
-                    end
-                    ui.set_enabled(item, boolean)
-                    return {self, boolean}
-                end,
-
-                ---@return {element: menu_element, function: callback} 
-                set_callback = function(self, callback)
-                    if not (self and callback) then
-                        menu_error("Invalid usage, please use: [element]:set_callback(void: function(element: reference, number: original))")
-                        return
-                    end
-                    ui.set_callback(item, function(menu_ref)
-                        callback(self, menu_ref)
-                    end)
-                    return {self, callback}
-                end,
-
-                ---@return name as string
-                name = function(self, original)
-                    if not self then
-                        menu_error("Invalid usage, please use: [element]:name(boolean?: original)")
-                        return
-                    end
-                    if original then
-                        return original
-                    else
-                        return ui.name(item)
-                    end
-                end,
-
-                ---@return type as string 
-                type = function(self)
-                    if not self then
-                        menu_error("Invalid usage, please use: [element]:type()")
-                        return
-                    end
-                    return ui.type(item)
-                end,
-
-                ---@return list_content as table
-                list = function(self)
-                    if not self then
-                        menu_error("Invalid usage, please use: [element]:list()")
-                        return
-                    end
-                    if type(args[4], "table") then
-                        return args[4]
-                    else
-                        return nil
-                    end
-                end,
-
-                ---@return {element: menu_element, dependency: menu_element, boolean: dependency_value, any: value} 
-                depend = function(self, dependency, value)
-                    if not (self and dependency) then
-                        menu_error("Invalid usage, please use: [element]:depend(element: menu_element)")
-                        return
-                    end
-
-                    self.visibility = ternary(value, menu.contains(dependency, value), dependency:get())
-                    ui.set_visible(item, ternary(value, menu.contains(dependency, value), dependency:get()))
-
-                    self.dependency = self.dependency or {}
-                    if not table.contains(self.dependency, dependency) then
-                        table.insert(self.dependency, dependency)
-                    end
-
-                    return ternary(value, {self, dependency, dependency:get(), value}, {self, dependency, dependency:get()})
-                end,
-
-                ---@return {element: menu_element, any: ...} 
-                update = function(self, ...)
-                    if not (self and ...) then
-                        menu_error("Invalid usage, please use: [element]:update(any: ...)")
-                        return
-                    end
-                    ui.update(item, unpack({...}))
-                    return {self, unpack({...})}
-                end,
-
-                ---@return value as boolean
-                contains = function(self, value)
-                    if not (self and value) then
-                        menu_error("Invalid usage, please use: [element]:contains(any: value)")
-                        return
-                    end
-                    return menu.contains(self, value)
-                end
-            }
-
-            setmetatable(struct, {
-                __tostring = function(self)
-                    if type(args[4], "table") then
-                        return string.format("%s::%s[%s](%s)", "element", index, #args[4], name)
-                    else
-                        return string.format("%s::%s(%s)", "element", index, name)
-                    end
-                end,
-                __newindex = function()
-                    return
-                end,
-                __metatable = false
-            })
-
-            return struct
+            return struct("element", item, args)
         end
     end,
     __newindex = function()
