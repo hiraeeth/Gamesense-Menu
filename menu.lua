@@ -1,4 +1,8 @@
-local menu = {}
+local menu = {
+    DEBUG = false,
+    SAFE_CALLBACKS = false,
+    CALLBACK_MESSAGE = "Callback failed: \f<error>"
+}
 
 ---@global overrides
 local function ternary(condition, true_value, false_value)
@@ -78,7 +82,7 @@ table.contains = function(tbl, item)
     --- @param tbl table The table to check
     --- @param item any The item to search for
     for _, value in pairs(tbl) do
-        if value == item then
+        if tostring(value) == tostring(item) then
             return true
         end
     end
@@ -123,10 +127,25 @@ local function menu_error(...)
     --- Prints menu-related errors to the console.
     --- @param ... any[] Error messages or values to print
     local args = { ... }
+
     parse(args, function(key, arg)
         args[key] = tostring(arg)
     end)
     print_colored({ _NAME .. " » ", 171, 219, 0 }, table.concat(args, " "))
+end
+
+local aliases = {}
+menu.alias = function(word, alias)
+    if word:find(" ") then
+        return menu_error("[menu_alias] You can not use empty spaces inside alises (use underline instead)")
+    end
+
+    if aliases[word] then
+        return menu_error(("[menu_alias] Word '%s' is already aliased as '%s'"):format(word, aliases[word]))
+    end
+
+    aliases[word] = alias
+    return { word, alias }
 end
 
 menu.contains = function(element, value)
@@ -160,9 +179,27 @@ menu.group = function(tab, container)
     --- @param container any The menu container
     local struct = {
         tab = tab,
-        container = container,
+        container = container
     }
     setmetatable(struct, {
+        __index = function(self, key)
+            return function(...)
+                local args = { ... }
+
+                if tostring(args[1]) ~= "menu::group" then
+                    return menu_error("[menu_group] Please use the menu group as an object.")
+                end
+
+                local g = args[1]
+                table.remove(args, 1)
+
+                if table.contains(args, "menu::group") then
+                    return menu_error("[menu_group] You can not use a group as argument.")
+                end
+
+                return menu[key](g.tab, g.container, unpack(args));
+            end
+        end,
         __tostring = function(self)
             return string.format("menu::%s", "group")
         end,
@@ -183,6 +220,7 @@ local function struct(menu_type, item, args)
     local struct = {
         dependency = {},
         is_visible = true,
+        menu_type = menu_type,
 
         --- Gets the value of the menu element.
         --- @return any The value of the menu element
@@ -246,15 +284,30 @@ local function struct(menu_type, item, args)
         --- @return {element: menu_element, function: callback} The menu element and set callback function
         set_callback = function(self, callback)
             if not self then
-                menu_error(("Invalid usage, please use: [%s]:set_callback(function(element,original))"):format(menu_type))
+                menu_error(("Invalid usage, please use: [%s]:set_callback(function(element, original))"):format(
+                menu_type))
                 return
             end
-            ui.set_callback(item, function(menu_ref)
-                callback(self, menu_ref)
-            end)
+
+            local safe = menu.SAFE_CALLBACKS or false
+            local cb = function(menu_ref)
+                if safe then
+                    local success, error_message = pcall(callback, self, menu_ref)
+                    if not success then
+                        local placeholder = menu.CALLBACK_MESSAGE:match("\f<(%w+)>")
+                        if (menu.DEBUG and not placeholder) then
+                            menu_error("WARNING! No error placeholder found, the error will be omitted from the message.");
+                        end
+                        return menu_error(placeholder and menu.CALLBACK_MESSAGE:gsub("\f<" .. placeholder .. ">", error_message) or menu.CALLBACK_MESSAGE)
+                    end
+                else
+                    callback(self, menu_ref)
+                end
+            end
+
+            ui.set_callback(item, cb)
             return { self, callback }
         end,
-
         --- Gets the name of the menu element.
         --- @return string The name of the menu element
         name = function(self)
@@ -376,24 +429,19 @@ end
 ---@return table A struct representing the menu element
 menu.find = function(...)
     local args = { ... }
+    local items = {}
 
-    local item = { ui.reference(unpack(args)) }
-    local child = args[#args]
-
-    if #item < child then
-        return menu_error("[menu_find] You are trying to access an invalid child (too big)")
+    local refs = { ui.reference(unpack(args)) }
+    for _, item in ipairs(refs) do
+        local ref = struct("reference", item);
+        table.insert(items, ref)
     end
 
-    if #item == 1 then
-        item = item[1]
-    else
-        if not type(child, "number") then
-            child = 1
-        end
-        item = item[child]
+    if (#items < 1) then
+        return menu_error("The element is either non-existent or the provided path is invalid.")
     end
 
-    return struct("reference", item)
+    return unpack(items)
 end
 
 setmetatable(menu, {
@@ -401,14 +449,21 @@ setmetatable(menu, {
         return function(...)
             local args = { ... }
 
-            for k, v in ipairs(args) do
-                if tostring(v) == "menu::group" then
-                    args[k] = v.tab;
-                    table.insert(args, k + 1, v.container)
+            parse(args, function(i, arg)
+                if type(arg) == "string" then
+                    local placeholder = arg:match("\f<(%w+)>")
+                    local alias = aliases[placeholder]
+                    if placeholder and alias then
+                        arg = arg:gsub("\f<" .. placeholder .. ">", alias)
+                        args[i] = arg
+                    end
                 end
-            end
+                if tostring(arg) == "menu::group" then
+                    args[i] = arg.tab;
+                    table.insert(args, i + 1, arg.container)
+                end
+            end)
 
-            local name = args[3]
             switch(index) {
                 button = function()
                     if args[4] == nil then
